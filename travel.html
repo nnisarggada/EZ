@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en" id="top">
+
+<head>
+  <link rel="stylesheet" type="text/css" href="https://js.api.here.com/v3/3.1/mapsjs-ui.css" />
+  <script type="text/javascript" src="https://js.api.here.com/v3/3.1/mapsjs-core.js"></script>
+  <script type="text/javascript" src="https://js.api.here.com/v3/3.1/mapsjs-service.js"></script>
+  <script type="text/javascript" src="https://js.api.here.com/v3/3.1/mapsjs-ui.js"></script>
+  <script type="text/javascript" src="https://js.api.here.com/v3/3.1/mapsjs-mapevents.js"></script>
+  <link href="https://stackpath.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet">
+  <script src="script.js"></script>
+  <link rel="stylesheet" href="style.css" />
+  <title>EV iz EZ | Travel</title>
+</head>
+
+<body>
+  <!-- NAVBAR -->
+
+  <nav>
+    <div class="container nav__container">
+      <div class="nav__logo">
+        <span>EZ</span>
+      </div>
+
+      <ul class="nav__menu">
+        <li class="ev"><a href="/">EV World</a></li>
+        <li class="travel active"><a href="/travel.html">Travel</a></li>
+      </ul>
+
+      <button id="open-menu-btn"><i class="fa-solid fa-bars"></i></button>
+      <button id="close-menu-btn"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+  </nav>
+
+  <!-- TRAVEL -->
+
+  <section id="travel">
+    <div class="travel__container" id="mapContainer">
+      <input placeholder="Search for a place" type="text" name="search" id="search"
+        onkeyup="autosuggest(this)" autofocus />
+      <i class="fa fa-search fa-search-custom" aria-hidden="true"></i>
+      <div class="dropdown">
+        <ul id="list"></ul>
+      </div>
+    </div>
+  </section>
+  <script>
+      function moveMapToBerlin(map) {
+        map.setCenter({ lat: 19.073112784289684, lng: 72.87018867645372 });
+        map.setZoom(10);
+      }
+      var platform = new H.service.Platform({
+        apikey: `U471LvyoFqEW2RiiTDe5u5kJPawldylKWeGEc9QLnRk` // replace with your api key
+      });
+      var defaultLayers = platform.createDefaultLayers();
+
+      //Step 2: initialize a map - this map is centered over Europe
+      var map = new H.Map(document.getElementById('mapContainer'),
+        defaultLayers.vector.normal.map, {
+        center: { lat: 50, lng: 5 },
+        zoom: 4,
+        pixelRatio: window.devicePixelRatio || 1
+      });
+
+      // add a resize listener to make sure that the map occupies the whole container
+      window.addEventListener('resize', () => map.getViewPort().resize());
+
+      //Step 3: make the map interactive
+      // MapEvents enables the event system
+      // Behavior implements default interactions for pan/zoom (also on mobile touch environments)
+      var behavior = new H.mapevents.Behavior(new H.mapevents.MapEvents(map));
+
+      // Create the default UI components
+      var ui = H.ui.UI.createDefault(map, defaultLayers);
+      // Now use the map as required...
+      window.onload = function () {
+        moveMapToBerlin(map);
+        getDeafultLocation();
+      }
+      const autosuggest = (e) => {
+        if (event.metaKey) {
+          return
+        }
+
+        let searchString = e.value
+        if (searchString != "") {
+          fetch(
+            `https://autosuggest.search.hereapi.com/v1/autosuggest?apiKey=U471LvyoFqEW2RiiTDe5u5kJPawldylKWeGEc9QLnRk&at=33.738045,73.084488&limit=5&resultType=city&q=${searchString}&lang=en-US`
+          )
+            .then((res) => res.json())
+            .then((json) => {
+              if (json.length != 0) {
+                document.getElementById("list").innerHTML = ``;
+                let dropData = json.items.map((item) => {
+                  if ((item.position != undefined) & (item.position != ""))
+                    document.getElementById("list").innerHTML += `<li onClick="addMarkerToMap(${item.position.lat},${item.position.lng},'${item.title}');
+                    
+                    findRoute(${item.position.lat},${item.position.lng});
+
+                    ">${item.title}</li>`;
+                });
+              }
+            });
+        }
+      };
+      // to get deafult location after loading the page
+      function getDeafultLocation() {
+        var lat = 19.073112784289684;
+        var lng = 72.87018867645372;
+        var title = "Mumbai, India";
+        addMarkerToMap(lat, lng, title);
+      }
+      // adding marker to map
+      const addMarkerToMap = (lat, lng, title) => {
+        map.removeObjects(map.getObjects())
+        document.getElementById("search").value = title;
+        var selectedLocationMarker = new H.map.Marker({ lat, lng });
+        map.addObject(selectedLocationMarker);
+        document.getElementById("list").innerHTML = ``;
+        map.setCenter({ lat, lng }, true);
+      };
+      const findRoute = (lat, lng) => {
+        navigator.geolocation.getCurrentPosition(function (position) {
+          const latitude = position.coords.latitude;
+          const longitude = position.coords.longitude;
+
+          let stations = [[19.035679150876557, 72.8590016188452], [19.017896105511632, 72.83590874991778], [18.991434883206296, 72.82520344644148], [18.981547371776983, 72.82562116677151], [18.93395549017215, 72.82649049608614]];
+
+          for (let i = 0; i < stations.length; i++) {
+            map.addObject(new H.map.Marker({ lat: stations[i][0], lng: stations[i][1] }))
+          };
+
+          map.addObject(new H.map.Marker({ lat: lat, lng: lng }))
+
+          var targetElement = document.getElementById('mapContainer');
+
+          var routingParameters = {
+            'routingMode': 'fast',
+            'transportMode': 'car',
+            // The start point of the route:
+            'origin': `${latitude},${longitude}`,
+            // The end point of the route:
+            'destination': `${lat},${lng}`,
+            // Include the route shape in the response
+            'return': 'polyline'
+          };
+
+          // Define a callback function to process the routing response:
+          var onResult = function (result) {
+            // ensure that at least one route was found
+            if (result.routes.length) {
+              result.routes[0].sections.forEach((section) => {
+                // Create a linestring to use as a point source for the route line
+                let linestring = H.geo.LineString.fromFlexiblePolyline(section.polyline);
+
+                // Create a polyline to display the route:
+                let routeLine = new H.map.Polyline(linestring, {
+                  style: { strokeColor: 'blue', lineWidth: 3 }
+                });
+
+                // Create a marker for the start point:
+                let startMarker = new H.map.Marker(section.departure.place.location);
+
+                // Create a marker for the end point:
+                let endMarker = new H.map.Marker(section.arrival.place.location);
+
+                // Add the route polyline and the two markers to the map:
+                map.addObjects([routeLine, startMarker, endMarker]);
+
+                // Set the map's viewport to make the whole route visible:
+                map.getViewModel().setLookAtData({ bounds: routeLine.getBoundingBox() });
+              });
+            }
+          };
+
+          // Get an instance of the routing service version 8:
+          var router = platform.getRoutingService(null, 8);
+
+          // Call calculateRoute() with the routing parameters,
+          // the callback and an error callback function (called if a
+          // communication error occurs):
+          router.calculateRoute(routingParameters, onResult,
+            function (error) {
+              alert(error.message);
+            });
+
+        });
+      };
+  </script>
+</body>
+
+</html>
